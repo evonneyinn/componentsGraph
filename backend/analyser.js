@@ -15,26 +15,39 @@ const path = args[2]
 var trees = []
 const subComponents = new Set()
 analyse(path).then(data => {
-    console.log(JSON.stringify(trees))
-    const server = http.createServer(function (req, res) {
-        res.setHeader('Access-Control-Allow-Origin', '*');
-	    res.setHeader('Access-Control-Request-Method', '*');
-	    res.setHeader('Access-Control-Allow-Methods', 'OPTIONS, GET');
-	    res.setHeader('Access-Control-Allow-Headers', '*');
-        res.writeHead(200, {'Content-type': 'application/json'})
-        res.end(JSON.stringify({data: trees}))
-    })
-    server.listen(port, function(error) {
-        if (error) {
-            console.log('Something went wrong', error)
-        } else {
-            console.log('Server is listening on port' + port)
-        }
-    })
+    outputGraph()
 })
 
+function outputGraph () {
+    var content = ''
+    content += 'digraph { \n'
+    trees.forEach((tree) => {
+        var queue = []
+        queue.push(tree)
+        while (queue.length !== 0) {
+            var current = queue.pop(0)
+            current.children.forEach ((child) => {
+                var line = '  ' + current.name + ' -> ' + child.name
+                if (child.isLoopStart) {
+                    line = line + ' [ style="dashed" ]'
+                }
+                line += " ;\n"
+                content += line
+                queue.push(child)
+            }) 
+        }
+    })
+    content += '}\n'
+    var split =  path.split('/')
+    var fileName =split[split.length-1] + '.gviz'
+    fs.writeFile(fileName, content, function (err, data) {
+        if (err) {
+            console.log('Could not write graph to file')
+        }
+    })
+}
+
 function buildNode (path, seen) {
-    console.log(seen)
     var content;
     try {
         content = fs.readFileSync(path, 'utf8')
