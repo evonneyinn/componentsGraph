@@ -15,20 +15,15 @@ const path = args[2]
 var trees = []
 const subComponents = new Set()
 analyse(path).then(data => {
-    console.log(trees)
+    console.log(JSON.stringify(trees))
     const server = http.createServer(function (req, res) {
-        res.writeHead(200, {'Content-type': 'text/html'})
-        fs.readFile('index.html', function(error, data) {
-            if (error) {
-                res.writeHead(404)
-                res.write('Error: File not found')
-            } else {
-                res.write(data)
-            }
-            res.end()
-        })
+        res.setHeader('Access-Control-Allow-Origin', '*');
+	    res.setHeader('Access-Control-Request-Method', '*');
+	    res.setHeader('Access-Control-Allow-Methods', 'OPTIONS, GET');
+	    res.setHeader('Access-Control-Allow-Headers', '*');
+        res.writeHead(200, {'Content-type': 'application/json'})
+        res.end(JSON.stringify({data: trees}))
     })
-    
     server.listen(port, function(error) {
         if (error) {
             console.log('Something went wrong', error)
@@ -38,7 +33,8 @@ analyse(path).then(data => {
     })
 })
 
-function buildNode (path) {
+function buildNode (path, seen) {
+    console.log(seen)
     var content;
     try {
         content = fs.readFileSync(path, 'utf8')
@@ -83,18 +79,23 @@ function buildNode (path) {
     const indexOfSlash = path.lastIndexOf('/')+1
     const dirpath = path.slice(0, indexOfSlash)
     const fileName = path.slice(indexOfSlash).replace('.vue', '')
-
+    /* check if in the loop before looking for children */
+    var hasSeen = seen.has(fileName)
     var children = []
-    components.forEach((component) => {
-        var child = buildNode(dirpath + importMap[component])
-        children.push(child)
-        subComponents.add(child.name)
-    })
-
-
+    if (!hasSeen) {
+        seen.add(fileName)
+        components.forEach((component) => {
+            var child = buildNode(dirpath + importMap[component], seen)
+            children.push(child)
+            subComponents.add(child.name)
+        })
+    }
+    seen.delete(fileName)
     return {
         'name': fileName,
-        'children': children
+        'children': children,
+        'linesOfCode': content.split('\n').length,
+        'isLoopStart': hasSeen
     }
 }
 
@@ -123,7 +124,7 @@ async function analyse (path) {
             } else {
                 newPath = newPath + '/' + dirent.name
             }
-            var tree = buildNode(newPath)
+            var tree = buildNode(newPath, new Set())
             trees.push(tree)
         }
     }
