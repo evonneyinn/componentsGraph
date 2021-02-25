@@ -2,30 +2,74 @@ const http = require('http')
 const fs = require('fs')
 const util = require('util')
 const { exit } = require('process')
-const { deepStrictEqual } = require('assert')
-const port = 3000
+const { exec } = require('child_process')
+const yargs = require('yargs');
 
+const argv = yargs
+    .option('hide', {
+        alias: 'hide',
+        description: 'Hide selected labels',
+        type: 'array',
+        default: []
+    })
+    .option('hide-all', {
+        alias: 'hideAll',
+        description: 'Hide all labels',
+        type: 'boolean',
+        default: false
+    })
+    .argv
+
+console.log(argv.hideAll)
 const args = process.argv
-if (args.length < 3) {
+if (argv._ < 1) {
     console.error('No file path specified')
     exit(1)
 }
 
-const path = args[2]
+const path = argv._[0]
+const hiddenLabels = argv.hide
+const hideAll = argv.hideAll
+var split =  path.split('/')
+var fileName =split[split.length-1]
 var trees = []
 const subComponents = new Set()
 analyse(path).then(data => {
     outputGraph()
-})
+    exec('dot -Tpdf ' + fileName + '.gviz > ' + fileName + '.pdf', (error, stdout, stderr) => {
+        if (error) {
+            console.log(error)
+            return
+        }
+    
+        if (stderr) {
+            console.log(`stderr: ${stderr}`)
+            return
+        }
+    })
+}) 
 
 function outputGraph () {
     var content = ''
     content += 'digraph { \n'
+    //content += '  size="10"\n'
+    content += '  node [shape = ellipse ];\n'
     trees.forEach((tree) => {
         var queue = []
-        queue.push(tree)
+        queue.push(tree) 
+        content += '  ' + tree.name + ' [ peripheries=2 ];\n'
         while (queue.length !== 0) {
             var current = queue.pop(0)
+            if (hideAll || hiddenLabels.includes(current.name)) {
+                content += '  ' + current.name + ' [ label="***\n' + current.linesOfCode + '" ];\n'
+            } else {
+                content += '  ' + current.name + ' [ label="' + current.name + '\n' + current.linesOfCode + '" ];\n'
+            }
+            
+            if (current.children.length === 0) {
+                var line = '  ' + current.name  + ' ;\n'
+                content += line
+            }
             current.children.forEach ((child) => {
                 var line = '  ' + current.name + ' -> ' + child.name
                 if (child.isLoopStart) {
@@ -38,14 +82,15 @@ function outputGraph () {
         }
     })
     content += '}\n'
-    var split =  path.split('/')
-    var fileName =split[split.length-1] + '.gviz'
-    fs.writeFile(fileName, content, function (err, data) {
+    var file = fileName + '.gviz'
+    fs.writeFile(file, content, function (err, data) {
         if (err) {
             console.log('Could not write graph to file')
         }
     })
 }
+
+
 
 function buildNode (path, seen) {
     var content;
