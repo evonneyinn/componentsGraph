@@ -36,6 +36,7 @@ var split = path.split('/')
 var fileName = split[split.length-1]
 var trees = []
 const subComponents = new Set()
+var componentList = []
 var isGitRepo = true
 var hashes = []
 
@@ -57,7 +58,7 @@ async function main() {
     if (isGitRepo) {
         for (const hash of hashes) {
             trees = []
-            console.log(hash)
+            componentList = []
             //Checkout commit
             try {
                 await exec('cd ' + path + ' && git checkout ' + hash)
@@ -74,6 +75,7 @@ async function main() {
             }
 
             var i = hashes.indexOf(hash).toString()
+            sortAndFilterComponents()
             outputGraph(i)
             await exec('dot -Tpng ' + fileName + i + '.gviz > ' + fileName + i + '.png')
         }
@@ -85,9 +87,34 @@ async function main() {
             exit(0)
         }
 
+        sortAndFilterComponents()
         outputGraph(null)
 
         await exec('dot -Tpng ' + fileName + '.gviz > ' + fileName + '.png')
+    }
+}
+
+function sortAndFilterComponents () {
+    // Sort the components by lines of code
+    componentList.sort((a, b) => {
+        if (a.linesOfCode > b.linesOfCode) {
+            return 1
+        } else if (a.linesOfCode < b.linesOfCode) {
+            return -1
+        }
+        return 0
+    })
+
+    // Filter duplicates
+    var length = componentList.length
+    var i = 0
+    while (i < length -1) {
+        if (componentList[i].name === componentList[i+1].name) {
+            componentList.splice(i+1, 1)
+            length -= 1
+        } else {
+            i++
+        }
     }
 }
 
@@ -105,9 +132,14 @@ function extractCommitsFromLog (log) {
 }
 
 function outputGraph (i) {
+    var topIndex = Math.ceil(componentList.length*0.95)-1
+    var topPercentile = componentList.slice(topIndex)
+    var topPercentileSet = new Set()
+    topPercentile.forEach((val)=>{
+        topPercentileSet.add(val.name)
+    })
     var content = ''
     content += 'digraph { \n'
-    //content += '  size="10"\n'
     content += '  node [shape = ellipse ];\n'
     trees.forEach((tree) => {
         var queue = []
@@ -115,10 +147,15 @@ function outputGraph (i) {
         content += '  ' + tree.name + ' [ peripheries=2 ];\n'
         while (queue.length !== 0) {
             var current = queue.pop(0)
+            var color = ''
+            if (topPercentileSet.has(current.name)) {
+                color = 'style=filled , fillcolor="#F06F86"'
+            }
+
             if (hideAll || hiddenLabels.includes(current.name)) {
-                content += '  ' + current.name + ' [ label="***\n' + current.linesOfCode + '" ];\n'
+                content += '  ' + current.name + ' [ label="***\n' + current.linesOfCode + '" , ' + color + ' ];\n'
             } else {
-                content += '  ' + current.name + ' [ label="' + current.name + '\n' + current.linesOfCode + '" ];\n'
+                content += '  ' + current.name + ' [ label="' + current.name + '\n' + current.linesOfCode + '" , ' + color + ' ];\n'
             }
             
             if (current.children.length === 0) {
@@ -208,6 +245,7 @@ function buildNode (path, seen) {
         })
     }
     seen.delete(fileName)
+    componentList.push({'name':fileName, 'linesOfCode':content.split('\n').length})
     return {
         'name': fileName,
         'children': children,
