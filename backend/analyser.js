@@ -1,10 +1,13 @@
 const http = require('http')
 const fs = require('fs')
 const util = require('util')
-const { exit } = require('process')
-const { exec } = require('child_process')
+const { exit, stderr, mainModule, stdout } = require('process')
+const exec = require('await-exec')
 const yargs = require('yargs');
+const { boolean } = require('yargs')
 
+
+// parse argument
 const argv = yargs
     .option('hide', {
         alias: 'hide',
@@ -20,7 +23,6 @@ const argv = yargs
     })
     .argv
 
-console.log(argv.hideAll)
 const args = process.argv
 if (argv._ < 1) {
     console.error('No file path specified')
@@ -30,26 +32,79 @@ if (argv._ < 1) {
 const path = argv._[0]
 const hiddenLabels = argv.hide
 const hideAll = argv.hideAll
-var split =  path.split('/')
-var fileName =split[split.length-1]
+var split = path.split('/')
+var fileName = split[split.length-1]
 var trees = []
 const subComponents = new Set()
-analyse(path).then(data => {
-    outputGraph()
-    exec('dot -Tpdf ' + fileName + '.gviz > ' + fileName + '.pdf', (error, stdout, stderr) => {
-        if (error) {
-            console.log(error)
-            return
+var isGitRepo = true
+var hashes = []
+
+main()
+
+async function main() {
+    //Check for Git repo
+    try {
+        let {stdout, stderr} = await exec('cd ' + path + ' && git log')
+        //Extract commits
+        hashes = extractCommitsFromLog(stdout)
+    } catch (error) {
+        if (error.toString().includes('not a git repository')) {
+            console.log('Not a Git repository. Analysing only current project state.')
+            isGitRepo = false
         }
-    
-        if (stderr) {
-            console.log(`stderr: ${stderr}`)
-            return
+    }
+
+    if (isGitRepo) {
+        for (const hash of hashes) {
+            trees = []
+            console.log(hash)
+            //Checkout commit
+            try {
+                await exec('cd ' + path + ' && git checkout ' + hash)
+            } catch (error) {
+                console.log('Could not analyse commit: ' + hash)
+                continue
+            }
+
+            await analyse(path)
+
+            if (trees.length === 0) {
+                console.log('Did not find any Vue files for commit: ' + hash)
+                return
+            }
+
+            var i = hashes.indexOf(hash).toString()
+            outputGraph(i)
+            await exec('dot -Tpng ' + fileName + i + '.gviz > ' + fileName + i + '.png')
+        }
+    } else {
+        await analyse(path)
+
+        if (trees.length === 0) {
+            console.log('Did not find any Vue files. Quitting...')
+            exit(0)
+        }
+
+        outputGraph(null)
+
+        await exec('dot -Tpng ' + fileName + '.gviz > ' + fileName + '.png')
+    }
+}
+
+function extractCommitsFromLog (log) {
+    var lines = log.split('\n')
+    var hashes = []
+    lines.forEach ((line) => { 
+        if (line.startsWith('commit')) {
+            var hash = line.split(' ')[1]
+            hashes.push(hash)
         }
     })
-}) 
+    hashes.reverse()
+    return hashes
+}
 
-function outputGraph () {
+function outputGraph (i) {
     var content = ''
     content += 'digraph { \n'
     //content += '  size="10"\n'
@@ -82,15 +137,19 @@ function outputGraph () {
         }
     })
     content += '}\n'
-    var file = fileName + '.gviz'
+    var file = ''
+    if (isGitRepo) {
+        file = fileName + i + '.gviz'
+    } else {
+        file = fileName + '.gviz'
+    }
+    
     fs.writeFile(file, content, function (err, data) {
         if (err) {
             console.log('Could not write graph to file')
         }
     })
 }
-
-
 
 function buildNode (path, seen) {
     var content;
