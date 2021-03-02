@@ -6,7 +6,6 @@ const exec = require('await-exec')
 const yargs = require('yargs');
 const { boolean } = require('yargs')
 
-
 // parse argument
 const argv = yargs
     .option('hide', {
@@ -140,7 +139,7 @@ function outputGraph (i) {
     })
     var content = ''
     content += 'digraph { \n'
-    content += '  node [shape = ellipse ];\n'
+    content += '  node [shape = circle];\n'
     trees.forEach((tree) => {
         var queue = []
         queue.push(tree) 
@@ -151,7 +150,8 @@ function outputGraph (i) {
             if (topPercentileSet.has(current.name)) {
                 color = 'style=filled , fillcolor="#F06F86"'
             }
-
+            var size = 2.5 + current.linesOfCode/80
+            content += '  ' + current.name + '[fixedsize=true, width=' + size + '];\n'
             if (hideAll || hiddenLabels.includes(current.name)) {
                 content += '  ' + current.name + ' [ label="***\n' + current.linesOfCode + '" , ' + color + ' ];\n'
             } else {
