@@ -4,7 +4,7 @@ const util = require('util')
 const { exit, stderr, mainModule, stdout } = require('process')
 const exec = require('await-exec')
 const yargs = require('yargs');
-const { boolean } = require('yargs')
+const sizeOf = require('image-size')
 
 // parse argument
 const argv = yargs
@@ -20,6 +20,12 @@ const argv = yargs
         type: 'boolean',
         default: false
     })
+    .option('gif', {
+        alias: 'gif',
+        description: 'Produce gif',
+        type: 'boolean',
+        default: false
+    })
     .argv
 
 const args = process.argv
@@ -31,6 +37,7 @@ if (argv._ < 1) {
 const path = argv._[0]
 const hiddenLabels = argv.hide
 const hideAll = argv.hideAll
+const gif = argv.gif
 var split = path.split('/')
 var fileName = split[split.length-1]
 var trees = []
@@ -55,6 +62,9 @@ async function main() {
     }
 
     if (isGitRepo) {
+        var gifString = ''
+        var maxHeight = 0
+        var maxWidth = 0
         for (const hash of hashes) {
             trees = []
             componentList = []
@@ -77,6 +87,26 @@ async function main() {
             sortAndFilterComponents()
             outputGraph(i)
             await exec('dot -Tpng ' + fileName + i + '.gviz > ' + fileName + i + '.png')
+            gifString += fileName + i + '.png '
+            try {
+                var dimensions = sizeOf(fileName + i + '.png')
+                if (dimensions.height > maxHeight) {
+                    maxHeight = dimensions.height
+                }
+                if (dimensions.width > maxWidth) {
+                    maxWidth = dimensions.width
+                }
+            } catch (error) {
+            }
+        }
+        if (gif) {
+            try {
+                await exec('convert -size ' + maxWidth + 'x' + maxHeight + ' canvas: white.png') //TODO dynamic size
+                var endIndex = hashes.length -1
+                await exec('convert -coalesce -delay 100 -loop 0 white.png ' + gifString + ' -deconstruct '+ fileName + '.gif') 
+            } catch (error) {
+                console.log("Error creating Gif. Try running it again")
+            } 
         }
     } else {
         await analyse(path)
