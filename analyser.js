@@ -101,7 +101,7 @@ async function main() {
         }
         if (gif) {
             try {
-                await exec('convert -size ' + maxWidth + 'x' + maxHeight + ' canvas: white.png') //TODO dynamic size
+                await exec('convert -size ' + maxWidth + 'x' + maxHeight + ' canvas: white.png')
                 var endIndex = hashes.length -1
                 await exec('convert -coalesce -delay 100 -loop 0 white.png ' + gifString + ' -deconstruct '+ fileName + '.gif') 
             } catch (error) {
