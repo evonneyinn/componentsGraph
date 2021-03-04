@@ -1,6 +1,4 @@
-const http = require('http')
 const fs = require('fs')
-const util = require('util')
 const { exit, stderr, mainModule, stdout } = require('process')
 const exec = require('await-exec')
 const yargs = require('yargs');
@@ -102,7 +100,6 @@ async function main() {
         if (gif) {
             try {
                 await exec('convert -size ' + maxWidth + 'x' + maxHeight + ' canvas: white.png')
-                var endIndex = hashes.length -1
                 await exec('convert -coalesce -delay 100 -loop 0 white.png ' + gifString + ' -deconstruct '+ fileName + '.gif') 
             } catch (error) {
                 console.log("Error creating Gif. Try running it again")

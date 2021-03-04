@@ -1,0 +1,25 @@
+{
+  "name": "compgraph",
+  "version": "1.0.0",
+  "description": "static analyser for Vue projects",
+  "main": "analyser.js",
+  "dependencies": {
+    "await-exec": "^0.1.2",
+    "image-size": "^0.9.4",
+    "yargs": "^16.2.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/evonneyinn/componentsGraph.git"
+  },
+  "author": "Evonne Yin",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/evonneyinn/componentsGraph/issues"
+  },
+  "homepage": "https://github.com/evonneyinn/componentsGraph#readme"
+}
